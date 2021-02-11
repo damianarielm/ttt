@@ -7,9 +7,7 @@
 % erl -name name@ip
 
 -module(tp).
--define(SERVERS, ['nodo1@127.0.0.1','nodo2@127.0.0.1']).
--define(LOADS, [999, 999]). % Cargas de trabajo iniciales.
--define(TABLEROINICIAL, [[1,1,1],[1,1,1],[1,1,1]]).
+-include("config.hrl").
 -export([init/0, dispatcher/1, pstat/0, checkuser/1, gamelist/1, mailbox/1, psocket/3, pcomando/5, pbalance/1]).
 
 load() -> length(erlang:ports()). % Funcion que calcula la carga del nodo.

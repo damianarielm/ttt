@@ -1,0 +1,3 @@
+-define(SERVERS, ['nodo1@127.0.0.1', 'nodo2@127.0.0.1']).
+-define(LOADS, [999, 999]). % Cargas de trabajo iniciales.
+-define(TABLEROINICIAL, [[1,1,1], [1,1,1],[1,1,1]]).
