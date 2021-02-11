@@ -7,9 +7,31 @@ El presente trabajo es un servidor de *ta te ti* distribuido.
 El servidor puede correrse en multiples instancias remotas que se comunican
 entre si, logrando atender los pedidos de los clientes de manera descentralidaza;
 de manera tal que cada peticion sea atendida por el sevidor que menos carga
-tenga en el momento de realizar la peticion por parte del cliente.
+tenga en el momento de realizarse por parte del cliente.
 
-### Arquitectura ###
+## Dependencias ##
+
+Para poder compilar el programa deberá contar con un compilador de *Erlang*.
+Si utiliza *Ubuntu*, puede instalarlo con el comando:
+
+```shell
+sudo apt install erlang
+```
+
+## Manual de uso ##
+
+### Servidores ###
+
+#### Configuracion ####
+
+Para configurar su cluster de servidores deberá editar el archivo *config.hrl*
+modificando la constante *SERVERS*.
+
+La misma deberá ser una lista de servidores con el formato 'nombre@ip'.
+
+### Clientes ###
+
+## Arquitectura ##
 
 La siguiente analogia pretente ilustrar el trafico de informacion entre los
 diferentes procesos y servidores que intervienen en el cluster.
