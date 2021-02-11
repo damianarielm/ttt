@@ -2,12 +2,8 @@
 
 -module(ttt).
 -include("config.hrl").
--import(aux, [winner/1]).
--export([init/0, dispatcher/1, checkuser/1, gamelist/1,
-         psocket/3, pcomando/5]).
-
-% Envia un mensaje al resto de los nodos (excluyendo el emisor).
-msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
+-import(aux, [winner/1, msgrest/2]).
+-export([init/0, dispatcher/1, checkuser/1, gamelist/1, psocket/3, pcomando/5]).
 
 % Inicializa el servidor.
 init() ->
