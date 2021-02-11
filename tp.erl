@@ -1,32 +1,29 @@
-% El cliente (cliente) llega a la puerta del bar (servidor) en donde es atendido por el recepcionista (dispatcher). Este lo dirige a la mesa en donde sera antendido por un mozo (psocket).
-% El cliente le indica su pedido al mozo, y este se dirige a hablar con el supervisor (pbalance). El supervisor le indica al mozo cual es la sucursal con menor carga de trabajo.
-% El mozo se dirige a la sucursal indicada por su supervisor y le solicita al cocinero (pcomando) el pedido del cliente. Una vez listo el pedido, el cocinero le notifica al mozo, el cual a su vez notifica al cliente.
-% Notese que para que el supervisor pueda indicarle al mozo cual es la sucursal con menor carga de trabajo, es necesario que se mantenga en contacto con los telefonistas (pstat) de todas las sucursales.
-% Estos se encargan de informar a los supervisores de las diferentes sucursales, cual es la carga de trabajo del local.
-
 % erl -name name@ip
 
 -module(tp).
 -include("config.hrl").
--export([init/0, dispatcher/1, pstat/0, checkuser/1, gamelist/1, mailbox/1, psocket/3, pcomando/5, pbalance/1]).
+-export([init/0, dispatcher/1, pstat/0, checkuser/1, gamelist/1,
+         mailbox/1, psocket/3, pcomando/5, pbalance/1]).
 
 load() -> length(erlang:ports()). % Funcion que calcula la carga del nodo.
 
 % Matriz transpuesta
 transpose([ [] | _ ]) -> [];
 transpose(M) -> [lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
-  
+
 % Determina si que jugador gano (1/2), si hay empate (3) o nada de lo anterior (0).
 winner(Tablero) ->
-  Sumas = [ lists:sum(lists:nth(X, Tablero)) || X <- [1,2,3] ] ++ % Sumas por filas
-          [ lists:sum(lists:nth(X, transpose(Tablero))) || X <- [1,2,3] ] ++ % Sumas por columnas
-          [ lists:nth(1, lists:nth(1, Tablero)) + lists:nth(2, lists:nth(2, Tablero)) + lists:nth(3, lists:nth(3, Tablero)) ] ++ 
+  Sumas = [ lists:sum(lists:nth(X, Tablero)) || X <- [1, 2, 3] ] ++ % Sumas por filas
+          [ lists:sum(lists:nth(X, transpose(Tablero))) || X <- [1, 2, 3] ] ++ % Sumas por columnas
+          [ lists:nth(1, lists:nth(1, Tablero)) + lists:nth(2, lists:nth(2, Tablero)) + lists:nth(3, lists:nth(3, Tablero)) ] ++
           [ lists:nth(1, lists:nth(3, Tablero)) + lists:nth(2, lists:nth(2, Tablero)) + lists:nth(3, lists:nth(1, Tablero)) ],
-  
+
   Ganador1 = lists:member(9, Sumas),
   Ganador2 = lists:member(27, Sumas),
-  Empate =  lists:member(1,lists:nth(1,Tablero)) or lists:member(1,lists:nth(2,Tablero)) or lists:member(1,lists:nth(3,Tablero)), % Casilleros disponibles
-  
+  Empate   = lists:member(1, lists:nth(1, Tablero)) or
+             lists:member(1, lists:nth(2, Tablero)) or
+             lists:member(1, lists:nth(3, Tablero)), % Casilleros disponibles
+
   if
     Ganador1 -> 1;
     Ganador2 -> 2;
@@ -42,7 +39,7 @@ playertoascii(Numero) ->
   end.
 
 % Transforma un tablero de jugadas, en caracteres imprimibles
-boardtoascii(Tablero) -> [lists:map(fun playertoascii/1,Fila) || Fila <- Tablero].
+boardtoascii(Tablero) -> [lists:map(fun playertoascii/1, Fila) || Fila <- Tablero].
 
 % Envia un mensaje al resto de los nodos (excluyendo el emisor).
 msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
@@ -71,15 +68,15 @@ checkuser(UserList) ->
 
     % Agrega un usuario a la lista
     {add, User} -> checkuser([User | UserList]);
-    
+
     % Elimina un usuario local que sale del programa
-    {del, User} -> 
+    {del, User} ->
       NewList = [X || X <- UserList, X /= User], % Nueva lista de usuarios
       msgrest(checkuser,{delmsg, NewList}), % Avisa el cambio a los demas nodos
       checkuser(NewList);
 
     % Actualiza la lista de usuarios, luego de que alguien se retiro de otro servidor
-    {delmsg, NewList} -> checkuser(NewList); 
+    {delmsg, NewList} -> checkuser(NewList);
 
     % Agrega un usuario de ser posible
     {Who, User} ->
@@ -105,27 +102,27 @@ gamelist(GameList) ->
     {print} -> io:format(">> Lista de partidas: ~p", [GameList]), gamelist(GameList);
 
     % Informa al jugador la lista de juegos.
-    {print, Who} -> Who!{lsg, [{X,Y} || {X,Y,_,_,_,_,_} <- GameList]}, gamelist(GameList);
+    {print, Who} -> Who!{lsg, [{X,Y} || {X, Y, _, _, _, _, _} <- GameList]}, gamelist(GameList);
 
     % Agrega a la lista, un juego creado en otro servidor.
     {newnode, Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} ->
-      gamelist([{Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} | GameList]); 
-  
+      gamelist([{Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} | GameList]);
+
     % Agrega un juego a la lista local.
     {new, Local, Visitante, Tablero, Observadores, Who} ->
-      case [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, (A == Local) or (B == Local) ] of
-	  [] ->
+      case [ {A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, (A == Local) or (B == Local) ] of
+      [] ->
             msgrest(gamelist,{newnode, Local, Visitante, Tablero, Observadores, Who, empty, true}), % Avisa el cambio a los demas nodos
             Who!{new, ok}, % Avisa que salio todo bien
             gamelist([{Local, Visitante, Tablero, Observadores, Who, empty, true} | GameList]); % Agrega el juego
           true -> Who!{new,error}, gamelist(GameList) % El creador ya ha creado una partida
       end;
-    
+
     % Actualiza un tablero modificado en otro servidor.
     {acttab, NewList} -> gamelist(NewList);
-    
+
     % Borra al usuario que se retira, de donde sea necesario.
-    {bye,Username,Who} -> 
+    {bye,Username,Who} ->
       % TODO ESTO ES INENTENDIBLE.
       Temp = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, ((E == Who) or (F == Who))],
       FinList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, F /= Who],
@@ -133,18 +130,18 @@ gamelist(GameList) ->
 
       checkuser!{del,Username}, % Borra al usuario de la lista de usuarios
       Who!{bye}, % Avisa al usuario de que puede retirarse
-      
+
       % Si es necesario, notifica a los observadores
       if Temp /= [] ->
         [{_,_,_,Observadores,_,_,_}] = Temp,
         [Mailbox!{bye} || Mailbox <- Observadores],
-        gamelist(FinalList);      
+        gamelist(FinalList);
         true -> gamelist(FinalList)
       end;
-      
+
     % Juega una jugada.
     {pla, Play, Who} ->
-    Temp = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, ((E == Who) and G) or ((F == Who) and (not G)) and (F /= empty) ],
+    Temp = [ {A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, ((E == Who) and G) or ((F == Who) and (not G)) and (F /= empty) ],
     if
       Temp /= [] ->
         [{_,_,Tablero,Observadores,Creador,_,Turno}] = Temp,
@@ -165,8 +162,8 @@ gamelist(GameList) ->
             [Mailbox!{pla,ok,NewBoard} || Mailbox <- Observadores],
             NewList = [{A,B,if (E == Who) or (F == Who) -> NewBoard; true -> C end,D,E,F,if (E == Who) or (F == Who) -> not G; true -> G end} || {A,B,C,D,E,F,G} <- GameList],
             [{gamelist, Node}!{acttab, NewList} || Node <- nodes()],
-            Result = winner(NewBoard), 
-            FinList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, (E /= Creador) ],
+            Result = winner(NewBoard),
+            FinList = [{A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, (E /= Creador) ],
             if
               Result == 0 -> Who!{pla, ok}, gamelist(NewList);
               Result == 1 -> [Mailbox!{fin1,NewBoard} || Mailbox <- Observadores], Who!{pla, ok}, gamelist(FinList);
@@ -183,12 +180,12 @@ gamelist(GameList) ->
   % Intenta unirse un observador.
   {obs, GameId, Username, Who, Mailbox} -> 
       Members = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, A == GameId, A /= Username, B /= Username, not lists:member(Mailbox,D)],
-      
+
       if
           Members /= [] ->
               Who!{obs, ok},
               NewList = [{A,B,C, case A of GameId -> [Mailbox] ++ D; _ -> D end,E,F,G} || {A,B,C,D,E,F,G} <- GameList],
-	      msgrest(gamelist,{newobs,NewList}),
+              msgrest(gamelist,{newobs,NewList}),
               gamelist(NewList);
           true -> Who!{obs,error}, gamelist(GameList)
       end;
@@ -197,7 +194,7 @@ gamelist(GameList) ->
   {actlist, NewList} -> gamelist(NewList);
 
   % Intenta unirse a una partida.
-  {acc, GameId, Username, Who, Mailbox} -> 
+  {acc, GameId, Username, Who, Mailbox} ->
       Members = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, A == GameId, B == empty, A /= Username ],
 
       if
@@ -262,13 +259,13 @@ psocket(Socket, Username, Mailbox) ->
         {BestNode} ->
           % io:format(">> Usuario ~p ejecutado comando ~p en ~p.~n", [Username, CMD, BestNode]),
           spawn(BestNode, ?MODULE, pcomando, [Socket, Username, CMD, self(), Mailbox]), % Crea el pcomando en el servidor correspondiente
-          
+
           % Espera la respuesta de pcomando
           receive
             {con, error} -> gen_tcp:send(Socket, ">> Usted ya ha elegido un nombre de usuario."), psocket(Socket, Username, Mailbox);
             {con, User} -> gen_tcp:send(Socket, ">> Nombre de usuario aceptado.\n"), psocket(Socket, User, Mailbox);
             {lsg, GameList} ->
-                R = io_lib:format("~p ~n",[GameList]), lists:flatten(R), 
+                R = io_lib:format("~p ~n", [GameList]), lists:flatten(R),
                 gen_tcp:send(Socket, [">> Lista de juegos: " | R]),
                 psocket(Socket, Username, Mailbox);
             {new, ok} -> gen_tcp:send(Socket, ">> Partida creada corectamente.\n"), psocket(Socket,Username,Mailbox);
@@ -288,7 +285,7 @@ psocket(Socket, Username, Mailbox) ->
 
 % Realiza los pedidos del cliente.
 pcomando(Socket, Username, CMD, Who, Mailbox) ->
-  % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]), 
+  % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]),
   if Username == Socket ->
       case string:tokens(string:strip(string:strip(CMD, right, $\n),right,$\r), " ") of
         ["CON", User] ->
@@ -303,7 +300,7 @@ pcomando(Socket, Username, CMD, Who, Mailbox) ->
           end;
         _ ->
           Who!{error,noname}
-       end; 
+       end;
     true ->
       case string:tokens(string:strip(string:strip(CMD, right, $\n),right,$\r), " ") of
         ["LSG"] -> {gamelist, node()}!{print, Who};
@@ -335,5 +332,5 @@ pbalance(LoadList) ->
     {Who, where} -> {BestNode, _} = lists:nth(1, lists:keysort(2, LoadList)), Who!{BestNode}, pbalance(LoadList);
 
     % Recibe la informacion de un pstat y actualiza la lista
-    {Node, Load} -> pbalance([{X,case X of Node -> Load; _ -> Y end} || {X,Y} <- LoadList])
+    {Node, Load} -> pbalance([{X, case X of Node -> Load; _ -> Y end} || {X,Y } <- LoadList])
   end.
