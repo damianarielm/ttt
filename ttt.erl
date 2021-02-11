@@ -2,9 +2,9 @@
 
 -module(ttt).
 -include("config.hrl").
--import(aux, [winner/1, boardtoascii/1]).
+-import(aux, [winner/1]).
 -export([init/0, dispatcher/1, checkuser/1, gamelist/1,
-         mailbox/1, psocket/3, pcomando/5]).
+         psocket/3, pcomando/5]).
 
 % Envia un mensaje al resto de los nodos (excluyendo el emisor).
 msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
@@ -177,41 +177,9 @@ gamelist(GameList) ->
 dispatcher(ListenSocket) ->
   {ok, Socket} = gen_tcp:accept(ListenSocket),
   io:format(">> Nuevo cliente: ~p.~n", [Socket]),
-  Mailbox = spawn(?MODULE, mailbox, [Socket]), % Crea la bandeja de entrada para el nuevo usuario.
+  Mailbox = spawn(mailbox, mailbox, [Socket]), % Crea la bandeja de entrada para el nuevo usuario.
   spawn(?MODULE, psocket, [Socket, Socket, Mailbox]),
   dispatcher(ListenSocket).
-
-% Recibe actualizaciones.
-mailbox(Socket) ->
-  receive
-    {bye} -> gen_tcp:send(Socket, ">> Un jugador ha abandonado la partida\n");
-    {acc,_,_} -> gen_tcp:send(Socket, ">> Un jugador se ha unido a la partida\n");
-    {pla, ok, Tablero} ->
-      [Fila1, Fila2, Fila3] = boardtoascii(Tablero),
-      gen_tcp:send(Socket, ">> Se ha realizado una jugada.\n"),
-      gen_tcp:send(Socket, Fila1), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila2), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila3), gen_tcp:send(Socket, "\n");
-    {fin1, Tablero} ->
-      [Fila1, Fila2, Fila3] = boardtoascii(Tablero),
-      gen_tcp:send(Socket, ">> La partida ha concluido. Gana el jugador O.\n"),
-      gen_tcp:send(Socket, Fila1), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila2), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila3), gen_tcp:send(Socket, "\n");
-    {fin2, Tablero} ->
-      [Fila1, Fila2, Fila3] = boardtoascii(Tablero),
-      gen_tcp:send(Socket, ">> La partida ha concluido. Gana el jugador X.\n"),
-      gen_tcp:send(Socket, Fila1), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila2), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila3), gen_tcp:send(Socket, "\n");
-    {emp, Tablero} ->
-      [Fila1, Fila2, Fila3] = boardtoascii(Tablero),
-      gen_tcp:send(Socket, ">> La partida ha concluido. Ha habido un empate.\n"),
-      gen_tcp:send(Socket, Fila1), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila2), gen_tcp:send(Socket, "\n"),
-      gen_tcp:send(Socket, Fila3), gen_tcp:send(Socket, "\n")
-  end,
-  mailbox(Socket).
 
 % Recibe los pedidos del cliente y se los encarga al servidor con menos carga.
 psocket(Socket, Username, Mailbox) ->
