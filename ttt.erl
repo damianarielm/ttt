@@ -3,7 +3,7 @@
 -module(ttt).
 -include("config.hrl").
 -import(aux, [winner/1, msgrest/2]).
--export([init/0, dispatcher/1, checkuser/1, gamelist/1, psocket/3, pcomando/5]).
+-export([init/0, dispatcher/1, gamelist/1, psocket/3, pcomando/5]).
 
 % Inicializa el servidor.
 init() ->
@@ -16,37 +16,9 @@ init() ->
       spawn(?MODULE, dispatcher, [ListenSocket]), % Lanza el dispatcher
       spawn(pstat , pstat, []), % Lanza el pstat
       register(gamelist, spawn(?MODULE, gamelist, [[]])), % Lanza el gamelist
-      register(checkuser, spawn(?MODULE, checkuser, [[]])), % Lanza el registro de usuarios
+      register(checkuser, spawn(checkuser, checkuser, [[]])), % Lanza el registro de usuarios
       register(pbalance, spawn(pbalance, pbalance, [lists:zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
       io:format(">> Servidor ~p escuchando en puerto: ~p.~n>> Asegurese de iniciar el resto de los servidores antes de comenzar ", [node(), Port])
-  end.
-
-% Maneja la lista de usuarios.
-checkuser(UserList) ->
-  receive
-    % Imprime por terminal la lista de usuarios
-    {print} -> io:format(">> Lista de usuarios: ~p", [UserList]), checkuser(UserList);
-
-    % Agrega un usuario a la lista
-    {add, User} -> checkuser([User | UserList]);
-
-    % Elimina un usuario local que sale del programa
-    {del, User} ->
-      NewList = [X || X <- UserList, X /= User], % Nueva lista de usuarios
-      msgrest(checkuser,{delmsg, NewList}), % Avisa el cambio a los demas nodos
-      checkuser(NewList);
-
-    % Actualiza la lista de usuarios, luego de que alguien se retiro de otro servidor
-    {delmsg, NewList} -> checkuser(NewList);
-
-    % Agrega un usuario de ser posible
-    {Who, User} ->
-      case lists:member(User, UserList) of
-        true -> Who!{error}, checkuser(UserList); % Avisa que el nombre de usuario esta ocupado
-        _ ->
-          msgrest(checkuser,{add,User}), % Avisa el cambio a los demas nodos
-          Who!{ok}, checkuser([User | UserList]) % Avisa que el usuario fue agregado correctamente
-      end
   end.
 
 % GameList es una lista de tuplas
