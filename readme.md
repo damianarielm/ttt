@@ -27,7 +27,7 @@ sudo apt install erlang
 Para configurar su cluster de servidores deberá editar el archivo *config.hrl*
 modificando la constante *SERVERS*.
 
-La misma deberá ser una lista de servidores con el formato 'nombre@ip'.
+La misma deberá ser una lista de servidores con el formato `'nombre@ip'`.
 
 #### Compilación ####
 
@@ -39,10 +39,11 @@ erl -make
 
 #### Ejecución ####
 
-En cada host ejecute el comando `erl -name servidor`, donde *servidor* es uno
+En cada host ejecute el comando `erl -name servidor`, donde `servidor` es uno
 de los elementos configurados en la constante *SERVERS*.
 
-Una vez iniciadas todas las consolas, ejecute la siguiente instrucción:
+Una vez iniciadas todas las consolas, ejecute en cada una de ellas la siguiente
+instrucción:
 
 ```
 ttt:init().
