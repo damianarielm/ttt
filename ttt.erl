@@ -4,7 +4,7 @@
 -include("config.hrl").
 -import(aux, [winner/1, boardtoascii/1]).
 -export([init/0, dispatcher/1, checkuser/1, gamelist/1,
-         mailbox/1, psocket/3, pcomando/5, pbalance/1]).
+         mailbox/1, psocket/3, pcomando/5]).
 
 % Envia un mensaje al resto de los nodos (excluyendo el emisor).
 msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
@@ -21,7 +21,7 @@ init() ->
       spawn(pstat , pstat, []), % Lanza el pstat
       register(gamelist, spawn(?MODULE, gamelist, [[]])), % Lanza el gamelist
       register(checkuser, spawn(?MODULE, checkuser, [[]])), % Lanza el registro de usuarios
-      register(pbalance, spawn(?MODULE, pbalance, [lists:zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
+      register(pbalance, spawn(pbalance, pbalance, [lists:zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
       io:format(">> Servidor ~p escuchando en puerto: ~p.~n>> Asegurese de iniciar el resto de los servidores antes de comenzar ", [node(), Port])
   end.
 
@@ -93,12 +93,12 @@ gamelist(GameList) ->
       FinList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, F /= Who],
       FinalList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- FinList, E /= Who],
 
-      checkuser!{del,Username}, % Borra al usuario de la lista de usuarios
+      checkuser!{del, Username}, % Borra al usuario de la lista de usuarios
       Who!{bye}, % Avisa al usuario de que puede retirarse
 
       % Si es necesario, notifica a los observadores
       if Temp /= [] ->
-        [{_,_,_,Observadores,_,_,_}] = Temp,
+        [{_, _, _, Observadores, _, _, _}] = Temp,
         [Mailbox!{bye} || Mailbox <- Observadores],
         gamelist(FinalList);
         true -> gamelist(FinalList)
@@ -276,16 +276,4 @@ pcomando(Socket, Username, CMD, Who, Mailbox) ->
         ["BYE"] -> gamelist!{bye, Username, Who};
         _ -> Who!{error, nocmd}
       end
-  end.
-
-pbalance(LoadList) ->
-  receive
-    % Imprime por terminal la carga de los nodos
-    {print} -> io:format("Balance de cargas: ~p", [LoadList]), pbalance(LoadList);
-
-    % Responde a un psocket, cual es el servidor con menor carga
-    {Who, where} -> {BestNode, _} = lists:nth(1, lists:keysort(2, LoadList)), Who!{BestNode}, pbalance(LoadList);
-
-    % Recibe la informacion de un pstat y actualiza la lista
-    {Node, Load} -> pbalance([{X, case X of Node -> Load; _ -> Y end} || {X,Y } <- LoadList])
   end.
