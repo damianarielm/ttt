@@ -29,6 +29,25 @@ modificando la constante *SERVERS*.
 
 La misma deberá ser una lista de servidores con el formato 'nombre@ip'.
 
+#### Compilación ####
+
+Para compilar el servidor, deberá utilizar la siguiente instrucción:
+
+```shell
+erl -make
+```
+
+#### Ejecución ####
+
+En cada host ejecute el comando `erl -name servidor`, donde *servidor* es uno
+de los elementos configurados en la constante *SERVERS*.
+
+Una vez iniciadas todas las consolas, ejecute la siguiente instrucción:
+
+```
+ttt:init().
+```
+
 ### Clientes ###
 
 ## Arquitectura ##
