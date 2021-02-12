@@ -8,16 +8,17 @@ playertoascii(3) -> hd("O");
 playertoascii(9) -> hd("X").
 
 % Transforma un tablero de jugadas, en caracteres imprimibles.
-boardtoascii(Tablero) -> [map(fun playertoascii/1, Fila) || Fila <- Tablero].
+boardtoascii(Tablero) ->
+    [map(fun playertoascii/1, Fila) || Fila <- Tablero].
 
 % Bandeja de entrada para cada usuario.
 mailbox(Socket) ->
     receive
         {bye} ->
-            send(Socket, ">> Un jugador ha abandonado la partida\n");
+            send(Socket, ">> Un jugador ha abandonado la partida.\n");
 
         {acc, _, _} ->
-            send(Socket, ">> Un jugador se ha unido a la partida\n");
+            send(Socket, ">> Un jugador se ha unido a la partida.\n");
 
         {pla, ok, Tablero} ->
             [Fila1, Fila2, Fila3] = boardtoascii(Tablero),

@@ -18,7 +18,7 @@ gamelist(GameList) ->
                gamelist(GameList);
 
     % Informa al jugador la lista de juegos.
-    {print, Who} -> Who!{lsg, [{X,Y} || {X, Y, _, _, _, _, _} <- GameList]},
+    {print, Who} -> Who!{lsg, [{X, Y} || {X, Y, _, _, _, _, _} <- GameList]},
                     gamelist(GameList);
 
     % Agrega a la lista, un juego creado en otro servidor.

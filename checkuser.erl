@@ -1,14 +1,14 @@
 -module(checkuser).
 -import(aux, [msgrest/2]).
 -import(lists, [member/2]).
--import(io, [format/2]).
+-import(io, [fwrite/2]).
 -export([checkuser/1]).
 
 % Maneja la lista de usuarios.
 checkuser(UserList) ->
     receive
         % Imprime por terminal la lista de usuarios
-        {print} -> format(">> Lista de usuarios: ~p", [UserList]),
+        {print} -> fwrite(">> Lista de usuarios: ~p", [UserList]),
                    checkuser(UserList);
 
         % Agrega un usuario a la lista
