@@ -1,6 +1,7 @@
 -module(gamelist).
--import(io, [format/2]).
+-import(io, [fwrite/2]).
 -import(aux, [msgrest/2, winner/1]).
+-import(lists, [keymember/3, keyfind/3]).
 -export([gamelist/1]).
 
 % GameList es una lista de tuplas
@@ -14,7 +15,7 @@
 gamelist(GameList) ->
   receive
     % Imprime por terminal la lista de juegos
-    {print} -> format(">> Lista de partidas: ~p", [GameList]),
+    {print} -> fwrite(">> Lista de partidas: ~p", [GameList]),
                gamelist(GameList);
 
     % Informa al jugador la lista de juegos.
@@ -22,38 +23,39 @@ gamelist(GameList) ->
                     gamelist(GameList);
 
     % Agrega a la lista, un juego creado en otro servidor.
-    {newnode, Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} ->
-      gamelist([{Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} | GameList]);
+    {newnode, Game} -> gamelist([Game | GameList]);
 
     % Agrega un juego a la lista local.
-    {new, Local, Visitante, Tablero, Observadores, Who} ->
-      case [ {A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, (A == Local) or (B == Local) ] of
-      [] ->
-            msgrest(gamelist,{newnode, Local, Visitante, Tablero, Observadores, Who, empty, true}), % Avisa el cambio a los demas nodos
-            Who!{new, ok}, % Avisa que salio todo bien
-            gamelist([{Local, Visitante, Tablero, Observadores, Who, empty, true} | GameList]); % Agrega el juego
-          true -> Who!{new,error}, gamelist(GameList) % El creador ya ha creado una partida
+    {new, Game} ->
+      {Local, _, _, _, Who, _, _} = Game,
+      case keymember(Local, 1, GameList) or keymember(Local, 2, GameList) of
+        false ->
+          msgrest(gamelist, {newnode, Game}), % Avisa el cambio a los demas nodos
+          Who!{new, ok}, % Avisa que salio todo bien
+          gamelist([Game | GameList]); % Agrega el juego
+        _ ->
+          Who!{new, error},
+          gamelist(GameList) % El creador ya ha creado una partida
       end;
 
     % Actualiza un tablero modificado en otro servidor.
     {acttab, NewList} -> gamelist(NewList);
 
     % Borra al usuario que se retira, de donde sea necesario.
-    {bye,Username,Who} ->
-      % TODO ESTO ES INENTENDIBLE.
-      Temp = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, ((E == Who) or (F == Who))],
-      FinList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, F /= Who],
-      FinalList = [{A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- FinList, E /= Who],
-
+    {bye, Username, Who} ->
       checkuser!{del, Username}, % Borra al usuario de la lista de usuarios
-      Who!{bye}, % Avisa al usuario de que puede retirarse
+      Who!{bye},% Avisa al usuario de que puede retirarse
 
-      % Si es necesario, notifica a los observadores
-      if Temp /= [] ->
-        [{_,  _, _, Observadores, _, _, _}] = Temp,
-        [Mailbox!{bye} || Mailbox <- Observadores],
-        gamelist(FinalList);
-        true -> gamelist(FinalList)
+      % Notifica a los observadores
+      {X, Y} = {keyfind(Who, 5, GameList), keyfind(Who, 6, GameList)},
+      case X of
+          false ->
+              {_, _, _, Observadores, _, _, _} = Y,
+              [Mailbox!{bye} || Mailbox <- Observadores];
+
+          _ ->
+              {_, _, _, Observadores, _, _, _} = X,
+              [Mailbox!{bye} || Mailbox <- Observadores]
       end;
 
     % Juega una jugada.

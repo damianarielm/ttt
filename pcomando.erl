@@ -32,7 +32,7 @@ pcomando(_, Username, CMD, Who, Mailbox) ->
             Who!{con, already};
 
         ["NEW"] ->
-            {gamelist, node()}!{new, Username, empty, ?TABLEROINICIAL, [Mailbox], Who};
+            {gamelist, node()}!{new, {Username, empty, ?TABLEROINICIAL, [Mailbox], Who, empty, true}};
 
         ["OBS", GameId] ->
             gamelist!{obs, GameId, Username, Who, Mailbox};

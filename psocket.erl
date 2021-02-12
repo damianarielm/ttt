@@ -21,7 +21,7 @@ psocket(Socket, Username, Mailbox) ->
 
                     receive
                         PcomandoAnswer ->
-                            respond_to_user(Pcomando_Answer, Socket, Username, Mailbox)
+                            respond_to_user(PcomandoAnswer, Socket, Username, Mailbox)
                     end
             end
     end.
