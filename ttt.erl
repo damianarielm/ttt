@@ -1,7 +1,6 @@
-
 -module(ttt).
 -include("config.hrl").
--import(io, [format/2]).
+-import(io, [fwrite/2]).
 -import(gen_tcp, [listen/2]).
 -import(inet, [port/1]).
 -import(lists, [zip/2]).
@@ -10,16 +9,27 @@
 
 % Inicializa el servidor.
 init() ->
-  {Atomo, ListenSocket} = listen(0, [{active, false}]),
-  if
-    Atomo /= ok -> format(">> Se ha producido un error ", []);
-    true ->
-      {ok, Port} = port(ListenSocket), % Busca un puerto disponible
-      [ping(Node) || Node <- ?SERVERS], % Reconoce a los otros nodos
-      spawn(dispatcher, dispatcher, [ListenSocket]), % Lanza el dispatcher
-      spawn(pstat , pstat, []), % Lanza el pstat
-      register(gamelist, spawn(gamelist, gamelist, [[]])), % Lanza el gamelist
-      register(checkuser, spawn(checkuser, checkuser, [[]])), % Lanza el registro de usuarios
-      register(pbalance, spawn(pbalance, pbalance, [zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
-      format(">> Servidor ~p escuchando en puerto: ~p.~n>> Asegurese de iniciar el resto de los servidores antes de comenzar ", [node(), Port])
-  end.
+    case listen(0, [{active, false}]) of
+        {error, Reason} ->
+            fwrite(">> Se ha producido un error: ~p.~n", [Reason]);
+
+        {ok, ListenSocket} ->
+            case port(ListenSocket) of
+                {error, _} ->
+                    fwrite(">> Se ha producido un error.~n", []);
+
+                {ok, Port} ->
+                    fwrite(">> Servidor ~p escuchando en puerto: ~p.~n", [node(), Port]),
+                    fwrite(">> Asegurese de iniciar el resto de los servidores antes de comenzar.~n", []),
+
+                    launch_processes(ListenSocket)
+            end
+    end.
+
+% Lanza los procesos necesarios.
+launch_processes(ListenSocket) ->
+    spawn(dispatcher, dispatcher, [ListenSocket]),
+    spawn(pstat, pstat, []),
+    register(gamelist, spawn(gamelist, gamelist, [[]])),
+    register(checkuser, spawn(checkuser, checkuser, [[]])),
+    register(pbalance, spawn(pbalance, pbalance, [zip(?SERVERS, ?LOADS)])).

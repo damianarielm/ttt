@@ -7,7 +7,7 @@
 % Realiza los pedidos del cliente.
 pcomando(Socket, Username, CMD, Who, Mailbox) ->
   % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]),
-  if Username == Socket ->
+  if Username == nousername ->
       case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
         ["CON", User] ->
           if
@@ -20,7 +20,7 @@ pcomando(Socket, Username, CMD, Who, Mailbox) ->
               end
           end;
         _ ->
-          Who!{error,noname}
+          Who!{error, nousername}
        end;
     true ->
       case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
