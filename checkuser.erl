@@ -26,6 +26,7 @@ checkuser(UserList) ->
             case member(User, UserList) of
                 true -> Who!{error}, checkuser(UserList);
                 _    -> msgrest(checkuser, {add, User}),
+                        Who!{ok},
                         checkuser([User | UserList])
             end
     end.
