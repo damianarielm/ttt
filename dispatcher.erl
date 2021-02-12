@@ -7,5 +7,5 @@ dispatcher(ListenSocket) ->
   {ok, Socket} = accept(ListenSocket),
   format(">> Nuevo cliente: ~p.~n", [Socket]),
   Mailbox = spawn(mailbox, mailbox, [Socket]), % Crea la bandeja de entrada para el nuevo usuario.
-  spawn(?MODULE, psocket, [Socket, Socket, Mailbox]),
+  spawn(psocket, psocket, [Socket, Socket, Mailbox]),
   dispatcher(ListenSocket).
