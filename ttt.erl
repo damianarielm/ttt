@@ -3,12 +3,11 @@
 -include("config.hrl").
 -import(aux, [winner/1, msgrest/2]).
 -import(io, [format/2]).
--import(gen_tcp, [listen/2, accept/1, recv/2, send/2, close/1]).
+-import(gen_tcp, [listen/2, recv/2, send/2, close/1]).
 -import(inet, [port/1]).
 -import(net_adm, [ping/1]).
 -import(lists, [zip/2, flatten/1]).
--import(string, [strip/3, tokens/2]).
--export([init/0, dispatcher/1, gamelist/1, psocket/3, pcomando/5]).
+-export([init/0, gamelist/1, psocket/3]).
 
 % Inicializa el servidor.
 init() ->
@@ -18,7 +17,7 @@ init() ->
     true ->
       {ok, Port} = port(ListenSocket), % Busca un puerto disponible
       [ping(Node) || Node <- ?SERVERS], % Reconoce a los otros nodos
-      spawn(?MODULE, dispatcher, [ListenSocket]), % Lanza el dispatcher
+      spawn(dispatcher, dispatcher, [ListenSocket]), % Lanza el dispatcher
       spawn(pstat , pstat, []), % Lanza el pstat
       register(gamelist, spawn(?MODULE, gamelist, [[]])), % Lanza el gamelist
       register(checkuser, spawn(checkuser, checkuser, [[]])), % Lanza el registro de usuarios
@@ -149,13 +148,6 @@ gamelist(GameList) ->
       end
   end.
 
-dispatcher(ListenSocket) ->
-  {ok, Socket} = accept(ListenSocket),
-  format(">> Nuevo cliente: ~p.~n", [Socket]),
-  Mailbox = spawn(mailbox, mailbox, [Socket]), % Crea la bandeja de entrada para el nuevo usuario.
-  spawn(?MODULE, psocket, [Socket, Socket, Mailbox]),
-  dispatcher(ListenSocket).
-
 % Recibe los pedidos del cliente y se los encarga al servidor con menos carga.
 psocket(Socket, Username, Mailbox) ->
   {Atomo, CMD} = recv(Socket, 0),
@@ -166,7 +158,7 @@ psocket(Socket, Username, Mailbox) ->
       receive
         {BestNode} ->
           % io:format(">> Usuario ~p ejecutado comando ~p en ~p.~n", [Username, CMD, BestNode]),
-          spawn(BestNode, ?MODULE, pcomando, [Socket, Username, CMD, self(), Mailbox]), % Crea el pcomando en el servidor correspondiente
+          spawn(BestNode, pcomando, pcomando, [Socket, Username, CMD, self(), Mailbox]), % Crea el pcomando en el servidor correspondiente
 
           % Espera la respuesta de pcomando
           receive
@@ -198,35 +190,5 @@ psocket(Socket, Username, Mailbox) ->
             {error,noname} -> send(Socket, [">> Para comenzar envie CON y su nombre de usuario.\n"]), psocket(Socket,Username,Mailbox);
             {_, _} -> send(Socket, [">> Comando incorrecto.\n Comandos disponibles: CON, LSG, NEW, ACC, OBS, PLA, BYE.\n"]), psocket(Socket,Username,Mailbox)
           end
-      end
-  end.
-
-% Realiza los pedidos del cliente.
-pcomando(Socket, Username, CMD, Who, Mailbox) ->
-  % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]),
-  if Username == Socket ->
-      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
-        ["CON", User] ->
-          if
-            Socket /= Username -> Who!{con, error};
-            true ->
-              {checkuser, node()}!{self(), User},
-              receive
-                {ok} -> format(">> Cliente ~p ahora se llama ~p.~n", [Socket, User]), Who!{con, User};
-                _ -> Who!{con, Username}
-              end
-          end;
-        _ ->
-          Who!{error,noname}
-       end;
-    true ->
-      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
-        ["LSG"] -> {gamelist, node()}!{print, Who};
-        ["NEW"] -> {gamelist, node()}!{new, Username, empty, ?TABLEROINICIAL, [Mailbox], Who};
-        ["OBS", GameId] -> gamelist!{obs, GameId, Username, Who, Mailbox};
-        ["ACC", GameId] -> gamelist!{acc, GameId, Username, Who, Mailbox};
-        ["PLA", Play] -> gamelist!{pla,Play,Who};
-        ["BYE"] -> gamelist!{bye, Username, Who};
-        _ -> Who!{error, nocmd}
       end
   end.
