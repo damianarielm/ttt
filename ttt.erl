@@ -1,24 +1,29 @@
-% erl -name name@ip
 
 -module(ttt).
 -include("config.hrl").
 -import(aux, [winner/1, msgrest/2]).
+-import(io, [format/2]).
+-import(gen_tcp, [listen/2, accept/1, recv/2, send/2, close/1]).
+-import(inet, [port/1]).
+-import(net_adm, [ping/1]).
+-import(lists, [zip/2, flatten/1]).
+-import(string, [strip/3, tokens/2]).
 -export([init/0, dispatcher/1, gamelist/1, psocket/3, pcomando/5]).
 
 % Inicializa el servidor.
 init() ->
-  {Atomo, ListenSocket} = gen_tcp:listen(0, [{active, false}]),
+  {Atomo, ListenSocket} =listen(0, [{active, false}]),
   if
-    Atomo /= ok -> io:format(">> Se ha producido un error ");
+    Atomo /= ok -> format(">> Se ha producido un error ", []);
     true ->
-      {ok, Port} = inet:port(ListenSocket), % Busca un puerto disponible
-      [net_adm:ping(Node) || Node <- ?SERVERS], % Reconoce a los otros nodos
+      {ok, Port} = port(ListenSocket), % Busca un puerto disponible
+      [ping(Node) || Node <- ?SERVERS], % Reconoce a los otros nodos
       spawn(?MODULE, dispatcher, [ListenSocket]), % Lanza el dispatcher
       spawn(pstat , pstat, []), % Lanza el pstat
       register(gamelist, spawn(?MODULE, gamelist, [[]])), % Lanza el gamelist
       register(checkuser, spawn(checkuser, checkuser, [[]])), % Lanza el registro de usuarios
-      register(pbalance, spawn(pbalance, pbalance, [lists:zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
-      io:format(">> Servidor ~p escuchando en puerto: ~p.~n>> Asegurese de iniciar el resto de los servidores antes de comenzar ", [node(), Port])
+      register(pbalance, spawn(pbalance, pbalance, [zip(?SERVERS, ?LOADS)])), % Lanza el pbalance
+      format(">> Servidor ~p escuchando en puerto: ~p.~n>> Asegurese de iniciar el resto de los servidores antes de comenzar ", [node(), Port])
   end.
 
 % GameList es una lista de tuplas
@@ -32,10 +37,12 @@ init() ->
 gamelist(GameList) ->
   receive
     % Imprime por terminal la lista de juegos
-    {print} -> io:format(">> Lista de partidas: ~p", [GameList]), gamelist(GameList);
+    {print} -> format(">> Lista de partidas: ~p", [GameList]),
+               gamelist(GameList);
 
     % Informa al jugador la lista de juegos.
-    {print, Who} -> Who!{lsg, [{X,Y} || {X, Y, _, _, _, _, _} <- GameList]}, gamelist(GameList);
+    {print, Who} -> Who!{lsg, [{X,Y} || {X, Y, _, _, _, _, _} <- GameList]},
+                    gamelist(GameList);
 
     % Agrega a la lista, un juego creado en otro servidor.
     {newnode, Local, Visitante, Tablero, Observadores, LocalId, VisId, Turno} ->
@@ -66,7 +73,7 @@ gamelist(GameList) ->
 
       % Si es necesario, notifica a los observadores
       if Temp /= [] ->
-        [{_, _, _, Observadores, _, _, _}] = Temp,
+        [{_,  _, _, Observadores, _, _, _}] = Temp,
         [Mailbox!{bye} || Mailbox <- Observadores],
         gamelist(FinalList);
         true -> gamelist(FinalList)
@@ -77,17 +84,17 @@ gamelist(GameList) ->
     Temp = [ {A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, ((E == Who) and G) or ((F == Who) and (not G)) and (F /= empty) ],
     if
       Temp /= [] ->
-        [{_,_,Tablero,Observadores,Creador,_,Turno}] = Temp,
+        [{_, _, Tablero, Observadores, Creador, _, Turno}] = Temp,
         [Aux] = Play,
         Jugada = Aux - 48,
         % Fila = trunc((Jugada-1)/3) + 1,
         % Columna = ((Jugada-1) rem 3) + 1,
-        [[P1,P2,P3],[P4,P5,P6],[P7,P8,P9]] = Tablero,
-        TableroCool = [P1,P2,P3,P4,P5,P6,P7,P8,P9],
+        [[P1, P2, P3], [P4, P5, P6], [P7, P8, P9]] = Tablero,
+        TableroCool = [P1, P2, P3, P4, P5, P6, P7, P8, P9],
         % Pos = (lists:nth(Columna, lists:nth(Fila, Tablero))),
         if
           true -> % Casillero vacio
-            if 
+            if
               Turno -> [J1,J2,J3,J4,J5,J6,J7,J8,J9] = lists:sublist(TableroCool,Jugada-1) ++ [lists:nth(Jugada,TableroCool)+2] ++ lists:nthtail(Jugada,TableroCool);
               true -> [J1,J2,J3,J4,J5,J6,J7,J8,J9] =  lists:sublist(TableroCool,Jugada-1) ++ [lists:nth(Jugada,TableroCool)+8] ++ lists:nthtail(Jugada,TableroCool)
             end,
@@ -111,7 +118,7 @@ gamelist(GameList) ->
   {newobs, NewList} -> gamelist(NewList);
 
   % Intenta unirse un observador.
-  {obs, GameId, Username, Who, Mailbox} -> 
+  {obs, GameId, Username, Who, Mailbox} ->
       Members = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, A == GameId, A /= Username, B /= Username, not lists:member(Mailbox,D)],
 
       if
@@ -143,17 +150,17 @@ gamelist(GameList) ->
   end.
 
 dispatcher(ListenSocket) ->
-  {ok, Socket} = gen_tcp:accept(ListenSocket),
-  io:format(">> Nuevo cliente: ~p.~n", [Socket]),
+  {ok, Socket} = accept(ListenSocket),
+  format(">> Nuevo cliente: ~p.~n", [Socket]),
   Mailbox = spawn(mailbox, mailbox, [Socket]), % Crea la bandeja de entrada para el nuevo usuario.
   spawn(?MODULE, psocket, [Socket, Socket, Mailbox]),
   dispatcher(ListenSocket).
 
 % Recibe los pedidos del cliente y se los encarga al servidor con menos carga.
 psocket(Socket, Username, Mailbox) ->
-  {Atomo, CMD} = gen_tcp:recv(Socket, 0),
+  {Atomo, CMD} = recv(Socket, 0),
   if
-    Atomo /= ok -> io:format(">> Se ha producido un error en el cliente ~p. Conexion cerrada.~n", [Username]);
+    Atomo /= ok -> format(">> Se ha producido un error en el cliente ~p. Conexion cerrada.~n", [Username]);
     true ->
       pbalance!{self(), where}, % Pregunta a pbalance en que servidor crear el pcomando
       receive
@@ -163,23 +170,33 @@ psocket(Socket, Username, Mailbox) ->
 
           % Espera la respuesta de pcomando
           receive
-            {con, error} -> gen_tcp:send(Socket, ">> Usted ya ha elegido un nombre de usuario."), psocket(Socket, Username, Mailbox);
-            {con, User} -> gen_tcp:send(Socket, ">> Nombre de usuario aceptado.\n"), psocket(Socket, User, Mailbox);
+            {con, error} -> send(Socket, ">> Usted ya ha elegido un nombre de usuario."),
+                            psocket(Socket, Username, Mailbox);
+            {con, User} -> send(Socket, ">> Nombre de usuario aceptado.\n"),
+                           psocket(Socket, User, Mailbox);
             {lsg, GameList} ->
-                R = io_lib:format("~p ~n", [GameList]), lists:flatten(R),
-                gen_tcp:send(Socket, [">> Lista de juegos: " | R]),
-                psocket(Socket, Username, Mailbox);
-            {new, ok} -> gen_tcp:send(Socket, ">> Partida creada corectamente.\n"), psocket(Socket,Username,Mailbox);
-            {new, error} -> gen_tcp:send(Socket, ">> Error: usted ya es miembro de una partida.\n"), psocket(Socket,Username,Mailbox);
-            {acc, ok} -> gen_tcp:send(Socket, ">> Usted se ha unido a la partida.\n"), psocket(Socket,Username,Mailbox);
-            {acc, error} -> gen_tcp:send(Socket, ">> Error: no se ha podido unir a la partida.\n"), psocket(Socket,Username,Mailbox);
-            {obs, ok} -> gen_tcp:send(Socket, ">> Usted esta observando la partida.\n"), psocket(Socket,Username,Mailbox);
-            {obs, error} -> gen_tcp:send(Socket, ">> Error: no se puede observar esa partida.\n"), psocket(Socket,Username,Mailbox);
+                R = format("~p ~n", [GameList]),
+                    flatten(R),
+                    send(Socket, [">> Lista de juegos: " | R]),
+                    psocket(Socket, Username, Mailbox);
+            {new, ok} -> send(Socket, ">> Partida creada corectamente.\n"),
+                         psocket(Socket,Username,Mailbox);
+            {new, error} -> send(Socket, ">> Error: usted ya es miembro de una partida.\n"),
+                            psocket(Socket,Username,Mailbox);
+            {acc, ok} -> send(Socket, ">> Usted se ha unido a la partida.\n"),
+                         psocket(Socket,Username,Mailbox);
+            {acc, error} -> send(Socket, ">> Error: no se ha podido unir a la partida.\n"),
+                            psocket(Socket,Username,Mailbox);
+            {obs, ok} -> send(Socket, ">> Usted esta observando la partida.\n"),
+                         psocket(Socket,Username,Mailbox);
+            {obs, error} -> send(Socket, ">> Error: no se puede observar esa partida.\n"),
+                            psocket(Socket,Username,Mailbox);
             {pla, ok} -> psocket(Socket,Username,Mailbox);
-            {pla, error} -> gen_tcp:send(Socket, ">> Error: no se puede aceptar la jugada.\n"), psocket(Socket,Username,Mailbox);
-            {bye} -> gen_tcp:send(Socket, ">> Adios!\n"), gen_tcp:close(Socket);
-            {error,noname} -> gen_tcp:send(Socket, [">> Para comenzar envie CON y su nombre de usuario.\n"]), psocket(Socket,Username,Mailbox);
-            {_, _} -> gen_tcp:send(Socket, [">> Comando incorrecto.\n Comandos disponibles: CON, LSG, NEW, ACC, OBS, PLA, BYE.\n"]), psocket(Socket,Username,Mailbox)
+            {pla, error} -> send(Socket, ">> Error: no se puede aceptar la jugada.\n"),
+                            psocket(Socket,Username,Mailbox);
+            {bye} -> send(Socket, ">> Adios!\n"), close(Socket);
+            {error,noname} -> send(Socket, [">> Para comenzar envie CON y su nombre de usuario.\n"]), psocket(Socket,Username,Mailbox);
+            {_, _} -> send(Socket, [">> Comando incorrecto.\n Comandos disponibles: CON, LSG, NEW, ACC, OBS, PLA, BYE.\n"]), psocket(Socket,Username,Mailbox)
           end
       end
   end.
@@ -188,14 +205,14 @@ psocket(Socket, Username, Mailbox) ->
 pcomando(Socket, Username, CMD, Who, Mailbox) ->
   % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]),
   if Username == Socket ->
-      case string:tokens(string:strip(string:strip(CMD, right, $\n),right,$\r), " ") of
+      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
         ["CON", User] ->
           if
             Socket /= Username -> Who!{con, error};
             true ->
               {checkuser, node()}!{self(), User},
               receive
-                {ok} -> io:format(">> Cliente ~p ahora se llama ~p.~n", [Socket, User]), Who!{con, User};
+                {ok} -> format(">> Cliente ~p ahora se llama ~p.~n", [Socket, User]), Who!{con, User};
                 _ -> Who!{con, Username}
               end
           end;
@@ -203,7 +220,7 @@ pcomando(Socket, Username, CMD, Who, Mailbox) ->
           Who!{error,noname}
        end;
     true ->
-      case string:tokens(string:strip(string:strip(CMD, right, $\n),right,$\r), " ") of
+      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
         ["LSG"] -> {gamelist, node()}!{print, Who};
         ["NEW"] -> {gamelist, node()}!{new, Username, empty, ?TABLEROINICIAL, [Mailbox], Who};
         ["OBS", GameId] -> gamelist!{obs, GameId, Username, Who, Mailbox};

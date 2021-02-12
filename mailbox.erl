@@ -33,5 +33,4 @@ mailbox(Socket) ->
             send(Socket, Fila2), send(Socket, "\n"),
             send(Socket, Fila3), send(Socket, "\n")
     end,
-
     mailbox(Socket).

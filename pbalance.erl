@@ -1,11 +1,12 @@
 -module(pbalance).
 -import(lists, [keysort/2, keyreplace/4]).
+-import(io, [format/2]).
 -export([pbalance/1]).
 
 pbalance(LoadList) ->
     receive
         % Imprime por terminal la carga de los nodos
-        {print} -> io:format("Balance de cargas: ~p", [LoadList]),
+        {print} -> format("Balance de cargas: ~p", [LoadList]),
                    pbalance(LoadList);
 
         % Responde a un psocket, cual es el servidor con menor carga
