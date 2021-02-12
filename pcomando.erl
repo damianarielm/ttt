@@ -1,35 +1,48 @@
 -module(pcomando).
 -include("config.hrl").
--import(string, [strip/3, tokens/2]).
--import(io, [format/2]).
+-import(string, [trim/1, tokens/2]).
+-import(io, [fwrite/2]).
 -export([pcomando/5]).
 
 % Realiza los pedidos del cliente.
-pcomando(Socket, Username, CMD, Who, Mailbox) ->
-  % io:format(">> Servidor ~p ejecutado comando ~p a peticion de ~p.~n", [node(), CMD, Username]),
-  if Username == nousername ->
-      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
-        ["CON", User] ->
-          if
-            Socket /= Username -> Who!{con, error};
-            true ->
-              {checkuser, node()}!{self(), User},
-              receive
-                {ok} -> format(">> Cliente ~p ahora se llama ~p.~n", [Socket, User]), Who!{con, User};
-                _ -> Who!{con, Username}
-              end
-          end;
+pcomando(Socket, nousername, CMD, Who, _) ->
+    case tokens(trim(CMD), " ") of
+        ["BYE"] ->
+            Who!{bye};
+        ["CON", Username] ->
+            {checkuser, node()}!{self(), Username},
+            receive
+                {ok} -> fwrite(">> Cliente ~p ahora se llama ~p.~n", [Socket, Username]),
+                        Who!{con, Username};
+                _    -> Who!{con, repeat}
+            end;
         _ ->
-          Who!{error, nousername}
-       end;
-    true ->
-      case tokens(strip(strip(CMD, right, $\n), right, $\r), " ") of
-        ["LSG"] -> {gamelist, node()}!{print, Who};
-        ["NEW"] -> {gamelist, node()}!{new, Username, empty, ?TABLEROINICIAL, [Mailbox], Who};
-        ["OBS", GameId] -> gamelist!{obs, GameId, Username, Who, Mailbox};
-        ["ACC", GameId] -> gamelist!{acc, GameId, Username, Who, Mailbox};
-        ["PLA", Play] -> gamelist!{pla,Play,Who};
-        ["BYE"] -> gamelist!{bye, Username, Who};
-        _ -> Who!{error, nocmd}
-      end
-  end.
+            Who!{error, nousername}
+    end;
+
+pcomando(_, Username, CMD, Who, Mailbox) ->
+    case tokens(trim(CMD), " ") of
+        ["BYE"] ->
+            gamelist!{bye, Username, Who};
+
+        ["LSG"] ->
+            {gamelist, node()}!{print, Who};
+
+        ["CON", _] ->
+            Who!{con, already};
+
+        ["NEW"] ->
+            {gamelist, node()}!{new, Username, empty, ?TABLEROINICIAL, [Mailbox], Who};
+
+        ["OBS", GameId] ->
+            gamelist!{obs, GameId, Username, Who, Mailbox};
+
+        ["ACC", GameId] ->
+            gamelist!{acc, GameId, Username, Who, Mailbox};
+
+        ["PLA", Play] ->
+            gamelist!{pla, Play, Who};
+
+        _ ->
+            Who!{error, nocmd}
+    end.

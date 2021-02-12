@@ -22,6 +22,7 @@ init() ->
                     fwrite(">> Servidor ~p escuchando en puerto: ~p.~n", [node(), Port]),
                     fwrite(">> Asegurese de iniciar el resto de los servidores antes de comenzar.~n", []),
 
+                    [ping(Node) || Node <- ?SERVERS],
                     launch_processes(ListenSocket)
             end
     end.

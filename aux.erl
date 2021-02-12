@@ -1,6 +1,6 @@
 -module(aux).
 -import(lists, [nth/2, map/2, member/2, sum/1, flatten/1]).
--export([winner/1, boardtoascii/1, msgrest/2]).
+-export([winner/1, msgrest/2]).
 
 % Envia un mensaje al resto de los nodos (excluyendo el emisor).
 msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
@@ -30,9 +30,3 @@ winner(Tablero) ->
         true       -> 0
     end.
 
-playertoascii(1) -> hd(".");
-playertoascii(3) -> hd("O");
-playertoascii(9) -> hd("X").
-
-% Transforma un tablero de jugadas, en caracteres imprimibles.
-boardtoascii(Tablero) -> [map(fun playertoascii/1, Fila) || Fila <- Tablero].

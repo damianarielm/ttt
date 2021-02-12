@@ -16,16 +16,18 @@ checkuser(UserList) ->
 
         % Elimina un usuario local que sale del programa
         {del, User} -> NewList = [X || X <- UserList, X /= User],
-                       msgrest(checkuser, {delmsg, NewList}),
+                       msgrest(checkuser, {update, NewList}),
                        checkuser(NewList);
 
         % Actualiza la lista de usuarios
-        {delmsg, NewList} -> checkuser(NewList);
+        {update, NewList} -> checkuser(NewList);
 
         % De ser posible, agrega un usuario
         {Who, User} ->
             case member(User, UserList) of
-                true -> Who!{error}, checkuser(UserList);
+                true -> Who!{con, repeat},
+                        checkuser(UserList);
+
                 _    -> msgrest(checkuser, {add, User}),
                         Who!{ok},
                         checkuser([User | UserList])
