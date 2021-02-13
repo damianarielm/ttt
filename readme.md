@@ -52,7 +52,7 @@ ttt:init().
 ### Clientes ###
 
 Este proyecto no cuenta con un cliente especializado, pero puede utilizar uno
-genérico. Por ejemplo puede utilizar *telnet*.
+genérico. Por ejemplo puede utilizar `telnet`.
 
 Los comandos aceptados por el servidor son:
 

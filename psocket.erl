@@ -84,8 +84,20 @@ respond_to_user(PcomandoAnswer, Socket, Username, Mailbox) ->
         {pla, ok} ->
             psocket(Socket, Username, Mailbox);
 
-        {pla, error} ->
-            send(Socket, ">> Error: no se puede aceptar la jugada.\n"),
+        {pla, empty} ->
+            send(Socket, ">> Error: Todavia no se unio nadie a la partida.\n"),
+            psocket(Socket,Username,Mailbox);
+
+        {pla, ocupado} ->
+            send(Socket, ">> Error: Ese casillero esta ocupado.\n"),
+            psocket(Socket,Username,Mailbox);
+
+        {pla, turn} ->
+            send(Socket, ">> Error: Todavia no es su turno.\n"),
+            psocket(Socket,Username,Mailbox);
+
+        {pla, notfound} ->
+            send(Socket, ">> Error: Primero debe unirse a una partida.\n"),
             psocket(Socket,Username,Mailbox);
 
         {bye} ->

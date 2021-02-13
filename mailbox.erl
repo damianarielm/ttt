@@ -3,13 +3,9 @@
 -import(lists, [map/2]).
 -export([mailbox/1]).
 
-playertoascii(1) -> hd(".");
-playertoascii(3) -> hd("O");
-playertoascii(9) -> hd("X").
-
 % Transforma un tablero de jugadas, en caracteres imprimibles.
 boardtoascii(Tablero) ->
-    [map(fun playertoascii/1, Fila) || Fila <- Tablero].
+    [map(fun aux:playertoascii/1, Fila) || Fila <- Tablero].
 
 % Bandeja de entrada para cada usuario.
 mailbox(Socket) ->

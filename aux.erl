@@ -1,6 +1,10 @@
 -module(aux).
 -import(lists, [nth/2, map/2, member/2, sum/1, flatten/1]).
--export([winner/1, msgrest/2]).
+-export([winner/1, msgrest/2, playertoascii/1]).
+
+playertoascii(1) -> hd(".");
+playertoascii(3) -> hd("O");
+playertoascii(9) -> hd("X").
 
 % Envia un mensaje al resto de los nodos (excluyendo el emisor).
 msgrest(Proceso, Mensaje) -> [{Proceso, Node}!Mensaje || Node <- nodes()].
@@ -17,7 +21,7 @@ winner(Tablero) ->
     Sumas = [ sum(Fila1), sum(Fila2), sum(Fila3) ] ++
             [ sum(Columna1), sum(Columna2), sum(Columna3) ] ++
             [ nth(1, Fila1) + nth(2, Fila2) + nth(3, Fila3) ] ++
-            [ nth(1, Fila3) + nth(2, Fila2) + nth(3, Fila3) ],
+            [ nth(3, Fila1) + nth(2, Fila2) + nth(1, Fila3) ],
 
     Ganador1 = member(9, Sumas),
     Ganador2 = member(27, Sumas),
