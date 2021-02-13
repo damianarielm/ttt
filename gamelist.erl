@@ -1,7 +1,7 @@
 -module(gamelist).
 -import(io, [fwrite/2]).
 -import(aux, [msgrest/2, winner/1]).
--import(lists, [keymember/3, keyfind/3]).
+-import(lists, [keymember/3, keyfind/3, keyreplace/4, member/2, keydelete/3]).
 -export([gamelist/1]).
 
 % GameList es una lista de tuplas
@@ -44,19 +44,25 @@ gamelist(GameList) ->
     % Borra al usuario que se retira, de donde sea necesario.
     {bye, Username, Who} ->
       checkuser!{del, Username}, % Borra al usuario de la lista de usuarios
-      Who!{bye},% Avisa al usuario de que puede retirarse
+      Who!{bye}, % Avisa al usuario de que puede retirarse
 
       % Notifica a los observadores
       {X, Y} = {keyfind(Who, 5, GameList), keyfind(Who, 6, GameList)},
       case X of
           false ->
-              {_, _, _, Observadores, _, _, _} = Y,
-              [Mailbox!{bye} || Mailbox <- Observadores];
+              case Y of
+                {_, _, _, Observadores, _, _, _} ->
+                  [Mailbox!{bye} || Mailbox <- Observadores];
+                _ -> undefined
+              end;
 
           _ ->
               {_, _, _, Observadores, _, _, _} = X,
               [Mailbox!{bye} || Mailbox <- Observadores]
-      end;
+      end,
+
+      NewList = keydelete(Who, 6, keydelete(Who, 5, GameList)),
+      gamelist(NewList);
 
     % Juega una jugada.
     {pla, Play, Who} ->
@@ -77,19 +83,24 @@ gamelist(GameList) ->
               Turno -> [J1,J2,J3,J4,J5,J6,J7,J8,J9] = lists:sublist(TableroCool,Jugada-1) ++ [lists:nth(Jugada,TableroCool)+2] ++ lists:nthtail(Jugada,TableroCool);
               true -> [J1,J2,J3,J4,J5,J6,J7,J8,J9] =  lists:sublist(TableroCool,Jugada-1) ++ [lists:nth(Jugada,TableroCool)+8] ++ lists:nthtail(Jugada,TableroCool)
             end,
-            NewBoard = [[J1,J2,J3],[J4,J5,J6],[J7,J8,J9]],
+            NewBoard = [[J1, J2, J3], [J4, J5, J6], [J7, J8, J9]],
             [Mailbox!{pla,ok,NewBoard} || Mailbox <- Observadores],
             NewList = [{A,B,if (E == Who) or (F == Who) -> NewBoard; true -> C end,D,E,F,if (E == Who) or (F == Who) -> not G; true -> G end} || {A,B,C,D,E,F,G} <- GameList],
             [{gamelist, Node}!{acttab, NewList} || Node <- nodes()],
             Result = winner(NewBoard),
             FinList = [{A, B, C, D, E, F, G} || {A, B, C, D, E, F, G} <- GameList, (E /= Creador) ],
             if
-              Result == 0 -> Who!{pla, ok}, gamelist(NewList);
-              Result == 1 -> [Mailbox!{fin1,NewBoard} || Mailbox <- Observadores], Who!{pla, ok}, gamelist(FinList);
-              Result == 2 -> [Mailbox!{fin2,NewBoard} || Mailbox <- Observadores], Who!{pla, ok}, gamelist(FinList);
-              Result == 3 -> [Mailbox!{emp,NewBoard} || Mailbox <- Observadores], Who!{pla, ok}, gamelist(FinList)
+              Result == 0 -> Who!{pla, ok},
+                             gamelist(NewList);
+              Result == 1 -> [Mailbox!{fin1, NewBoard} || Mailbox <- Observadores], Who!{pla, ok},
+                             gamelist(FinList);
+              Result == 2 -> [Mailbox!{fin2, NewBoard} || Mailbox <- Observadores], Who!{pla, ok},
+                             gamelist(FinList);
+              Result == 3 -> [Mailbox!{emp, NewBoard} || Mailbox <- Observadores], Who!{pla, ok},
+                             gamelist(FinList)
             end
         end;
+
       true -> Who!{pla,error}, gamelist(GameList)
     end;
 
@@ -98,15 +109,21 @@ gamelist(GameList) ->
 
   % Intenta unirse un observador.
   {obs, GameId, Username, Who, Mailbox} ->
-      Members = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, A == GameId, A /= Username, B /= Username, not lists:member(Mailbox,D)],
+      Game = keyfind(GameId, 1, GameList),
+      case Game of
+        false -> Who!{obs, notfound}, gamelist(GameList);
 
-      if
-          Members /= [] ->
-              Who!{obs, ok},
-              NewList = [{A,B,C, case A of GameId -> [Mailbox] ++ D; _ -> D end,E,F,G} || {A,B,C,D,E,F,G} <- GameList],
-              msgrest(gamelist,{newobs,NewList}),
-              gamelist(NewList);
-          true -> Who!{obs,error}, gamelist(GameList)
+        {A, B, C, D, E, F, G} ->
+          case (Username == A) or (Username == B) or (member(G, D)) of
+              true -> Who!{obs, error}, gamelist(GameList);
+
+              _ ->
+                Who!{obs, ok},
+                NewGame = {A, B, C, [Mailbox] ++ D, E, F, G},
+                NewList = keyreplace(GameId, 1, GameList, NewGame),
+                msgrest(gamelist, {newobs, NewList}),
+                gamelist(NewList)
+          end
       end;
 
   % Actualiza la lista cuando se une un jugador en otro servidor.
@@ -114,16 +131,24 @@ gamelist(GameList) ->
 
   % Intenta unirse a una partida.
   {acc, GameId, Username, Who, Mailbox} ->
-      Members = [ {A,B,C,D,E,F,G} || {A,B,C,D,E,F,G} <- GameList, A == GameId, B == empty, A /= Username ],
+      Game = keyfind(GameId, 1, GameList),
+      case Game of
+        false -> Who!{acc, notfound}, gamelist(GameList);
 
-      if
-          Members /= [] ->
+        {A, empty, C, D, E, empty, G} ->
+          case Username == A of
+            true -> Who!{acc, error}, gamelist(GameList);
+            _ ->
               Who!{acc, ok},
-              NewList = [{A, case A of GameId -> Username; _ -> B end,C,[Mailbox] ++ D,E, Who,G} || {A,B,C,D,E,_,G} <- GameList],
-              [{gamelist, Node}!{actlist, NewList} || Node <- nodes()],
-              [{_,_,_,Observadores,_,_,_}] = NewList,
-              [Mailboxes!{acc,Username,GameId} || Mailboxes <- Observadores, Mailboxes /= Mailbox],
-              gamelist(NewList);
-          true -> Who!{acc,error}, gamelist(GameList)
+              NewGame = {A, Username, C, [Mailbox] ++ D, E, Who, G},
+              NewList = keyreplace(GameId, 1, GameList, NewGame),
+
+              msgrest(gamelist, {actlist, NewList}),
+              [Mailboxes!{acc, Username, GameId} || Mailboxes <- D],
+
+              gamelist(NewList)
+           end;
+
+        _  -> Who!{acc, full}, gamelist(GameList)
       end
-  end.
+    end.

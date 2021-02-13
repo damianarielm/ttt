@@ -17,8 +17,10 @@ mailbox(Socket) ->
         {bye} ->
             send(Socket, ">> Un jugador ha abandonado la partida.\n");
 
-        {acc, _, _} ->
-            send(Socket, ">> Un jugador se ha unido a la partida.\n");
+        {acc, Username, GameId} ->
+            send(Socket, ">> '"), send(Socket, Username),
+            send(Socket, "' se ha unido a la partida '"),
+            send(Socket, GameId), send(Socket, "'.\n");
 
         {pla, ok, Tablero} ->
             [Fila1, Fila2, Fila3] = boardtoascii(Tablero),

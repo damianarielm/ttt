@@ -57,16 +57,28 @@ respond_to_user(PcomandoAnswer, Socket, Username, Mailbox) ->
             send(Socket, ">> Usted se ha unido a la partida.\n"),
             psocket(Socket, Username, Mailbox);
 
+        {acc, full} ->
+            send(Socket, ">> Error: La partida esta llena.\n"),
+            psocket(Socket, Username, Mailbox);
+
+        {acc, notfound} ->
+            send(Socket, ">> Error: no se encuentra esa partida.\n"),
+            psocket(Socket, Username, Mailbox);
+
         {acc, error} ->
-            send(Socket, ">> Error: no se ha podido unir a la partida.\n"),
+            send(Socket, ">> Error: Usted ha creado esa partida.\n"),
             psocket(Socket, Username, Mailbox);
 
         {obs, ok} ->
-            send(Socket, ">> Usted esta observando la partida.\n"),
+            send(Socket, ">> Observando la partida.\n"),
             psocket(Socket, Username, Mailbox);
 
         {obs, error} ->
-            send(Socket, ">> Error: no se puede observar esa partida.\n"),
+            send(Socket, ">> Error: usted ya esta observando esa partida.\n"),
+            psocket(Socket, Username, Mailbox);
+
+        {obs, notfound} ->
+            send(Socket, ">> Error: no se encuentra esa partida.\n"),
             psocket(Socket, Username, Mailbox);
 
         {pla, ok} ->
