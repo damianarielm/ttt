@@ -51,6 +51,19 @@ ttt:init().
 
 ### Clientes ###
 
+Este proyecto no cuenta con un cliente especializado, pero puede utilizar uno
+genérico. Por ejemplo puede utilizar *telnet*.
+
+Los comandos aceptados por el servidor son:
+
+* CON *username*: Inicia la comunicación con el servidor.
+* LSG: Lista los juegos disponibles.
+* NEW: Crea una nueva partida.
+* ACC *game*: Se une a la partida *game*.
+* OBS *game*: Observa el juego *game*.
+* BYE: Abandona el servidor.
+* PLA *number*: Pone una ficha en el tablero.
+
 ## Arquitectura ##
 
 La siguiente analogia pretente ilustrar el trafico de informacion entre los
